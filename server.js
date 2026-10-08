@@ -5,22 +5,21 @@ import { GoogleGenAI } from '@google/genai'; // SDK oficial actualizado
 
 const app = express();
 
-// CRÍTICO: Aumentar el límite a 50mb para permitir recibir notas de voz en Base64
+// CRÍTICO: Aumentar el límite a 50mb para recibir notas de voz en Base64
 app.use(express.json({ limit: '50mb' }));
 app.use(cors());
 
-// Inicializar cliente de Google GenAI (utiliza la variable de entorno GEMINI_API_KEY de Render)
+// Inicializar cliente de Google GenAI
 const ai = new GoogleGenAI();
 
 const PORT = process.env.PORT || 3000;
 
-// Endpoint protegido para procesar consultas de IA (Texto y Audio)
 app.post('/api/ai/consult', async (req, res) => {
     try {
+        // LEEMOS EXACTAMENTE LO QUE ENVÍA EL FRONTEND ("prompt")
         const { prompt, audioData, profileContext } = req.body;
         let aiContents;
 
-        // 1. Verificar si la solicitud es una nota de voz (Live Mentor)
         if (audioData) {
             console.log("Procesando nota de voz entrante...");
             aiContents = [
@@ -28,40 +27,29 @@ app.post('/api/ai/consult', async (req, res) => {
                 { inlineData: { data: audioData, mimeType: "audio/webm" } }
             ];
         } 
-        // 2. Verificar si es una solicitud de texto estándar (Diccionario, Talleres)
         else if (prompt) {
+            console.log("Procesando solicitud de texto:", prompt.substring(0, 50) + "...");
             aiContents = prompt;
         } 
         else {
             return res.status(400).json({ success: false, error: "No se proporcionó texto ni audio." });
         }
 
-        // Llamada optimizada al modelo
         const response = await ai.models.generateContent({
-            model: 'gemini-3.8-flash', // O el modelo vigente recomendado
+            model: 'gemini-3.8-flash', // O el modelo que estés usando
             contents: aiContents,
             generationConfig: {
-                // Usamos un thinking_level bajo para el Live Mentor para garantizar respuestas casi en tiempo real
                 thinking_level: audioData ? "low" : "medium" 
             }
         });
 
-        // El frontend espera la respuesta en la propiedad "reply"
+        // EL FRONTEND ESPERA ESTRICTAMENTE LA PROPIEDAD "reply"
         res.json({ success: true, reply: response.text() });
 
     } catch (error) {
         console.error("Error connecting with Gemini API:", error);
-        res.status(500).json({ success: false, reply: "Error interno procesando la solicitud de IA." });
+        res.status(500).json({ success: false, reply: '{"status": "FAIL", "html": "<p>Error de procesamiento de IA</p>", "detectedMistake": "Error 500"}' });
     }
-});
-
-// Endpoint de sincronización de datos de usuario en la nube (Opcional a futuro)
-app.post('/api/users/:id/sync', (req, res) => {
-    const userId = req.params.id;
-    const { progress, lexicon } = req.body;
-    
-    console.log(`Syncing data for user ${userId} in cloud database...`);
-    res.json({ success: true, message: "Datos sincronizados correctamente en la nube." });
 });
 
 app.listen(PORT, () => {
