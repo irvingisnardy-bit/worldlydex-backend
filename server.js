@@ -7,7 +7,27 @@ const app = express();
 
 // Aumentar el límite a 50mb para recibir notas de voz en Base64
 app.use(express.json({ limit: '50mb' }));
-app.use(cors());
+
+// 1. Define tu lista blanca de dominios permitidos para seguridad (CORS)
+const allowedOrigins = [
+  'http://localhost:5500', 
+  'http://127.0.0.1:5500', 
+  'https://worldlydex.irvingabreuv.workers.dev' // Tu entorno de producción Cloudflare
+];
+
+const corsOptions = {
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Bloqueado por CORS'));
+    }
+  },
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+};
+
+app.use(cors(corsOptions));
 
 // Inicializar cliente de Google GenAI (requiere GEMINI_API_KEY en entorno)
 const ai = new GoogleGenAI({}); 
