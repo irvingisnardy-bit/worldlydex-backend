@@ -1,18 +1,16 @@
 // server.js - Backend Principal para Worldlydex (Node.js & Express)
 import express from 'express';
 import cors from 'cors';
-import { GoogleGenAI } from '@google/genai'; // SDK oficial actualizado
+import { GoogleGenAI } from '@google/genai';
 
 const app = express();
 
-// Aumentar el límite a 50mb para recibir notas de voz en Base64
 app.use(express.json({ limit: '50mb' }));
 
-// 1. Define tu lista blanca de dominios permitidos para seguridad (CORS)
 const allowedOrigins = [
   'http://localhost:5500', 
   'http://127.0.0.1:5500', 
-  'https://worldlydex.irvingabreuv.workers.dev' // Tu entorno de producción Cloudflare
+  'https://worldlydex.irvingabreuv.workers.dev'
 ];
 
 const corsOptions = {
@@ -29,10 +27,14 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 
-// Inicializar cliente de Google GenAI (requiere GEMINI_API_KEY en entorno)
 const ai = new GoogleGenAI({}); 
 
 const PORT = process.env.PORT || 3000;
+
+// --- NUEVA RUTA LIGERA PARA EL CRON-JOB ---
+app.get('/api/ping', (req, res) => {
+    res.status(200).send('OK');
+});
 
 app.post('/api/ai/consult', async (req, res) => {
     try {
@@ -54,16 +56,12 @@ app.post('/api/ai/consult', async (req, res) => {
             return res.status(400).json({ success: false, error: "No se proporcionó texto ni audio." });
         }
 
-        // USO CORRECTO DEL SDK @google/genai Y MODELO gemini-3.8-flash
         const response = await ai.models.generateContent({
             model: 'gemini-3.8-flash', 
             contents: finalContents,
-            config: {
-                 // Configuración por defecto
-            }
+            config: {}
         });
 
-        // CRÍTICO: En el nuevo SDK, .text es una propiedad, NO una función (sin paréntesis)
         res.json({ success: true, reply: response.text });
 
     } catch (error) {
